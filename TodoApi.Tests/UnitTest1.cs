@@ -1,95 +1,118 @@
 using Xunit;
+using Moq;
 using TodoApi.Services;
+using TodoApi.Repositories;
+using TodoApi.DTOs;
 using TodoApi.Models;
-using TodoApi.Controllers;
-using Microsoft.AspNetCore.Mvc;
+using System.Collections.Generic;
 
 namespace TodoApi.Tests;
 
 public class UnitTest1
 {
-    [Fact]
-    public void Test1()
+    private readonly Mock<ITodoRepository> _repoMock;
+    private readonly TodoService _service;
+
+    public UnitTest1()
     {
-        var service = new TodoService();
-        Assert.True(true);
+        _repoMock = new Mock<ITodoRepository>();
+        _service = new TodoService(_repoMock.Object);
     }
 
     [Fact]
-    public void TestCreateTodo()
+    public void GetAll_ReturnsTodos_WhenDataExists()
     {
-        var service = new TodoService();
-        var todo = new Todo
+        _repoMock.Setup(r => r.GetAll())
+            .Returns(new List<Todo>
+            {
+                new Todo { Id = 1, Title = "Test" }
+            });
+
+        var result = _service.GetAll();
+
+        Assert.Single(result);
+    }
+
+    [Fact]
+    public void GetAll_ReturnsEmpty_WhenNoData()
+    {
+        _repoMock.Setup(r => r.GetAll())
+            .Returns(new List<Todo>());
+
+        var result = _service.GetAll();
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void Create_CallsRepositoryCreate()
+    {
+        var dto = new CreateTodoDto
         {
-            Title = "Test",
-            Description = "Test Description",
-            IsCompleted = false
+            Title = "New Todo",
+            Description = "Desc"
         };
 
-        var result = service.CreateTodo(todo);
+        _service.Create(dto);
 
-        Assert.NotNull(result);
-        Assert.True(result.Id > 0);
+        _repoMock.Verify(r => r.Create(It.IsAny<Todo>()), Times.Once);
     }
 
     [Fact]
-    public void TestGetTodo()
+    public void Update_ReturnsTrue_WhenTodoExists()
     {
-        var service = new TodoService();
-        var todos = service.GetAllTodos();
+        _repoMock.Setup(r => r.Update(It.IsAny<Todo>()))
+            .Returns(true);
 
-        Assert.True(todos.Count > 0);
-    }
-
-    [Fact]
-    public void UpdateTest()
-    {
-        var service = new TodoService();
-        var todo = new Todo
+        var dto = new UpdateTodoDto
         {
             Title = "Updated",
-            Description = "Updated Description",
+            Description = "Updated",
             IsCompleted = true
         };
 
-        var result = service.UpdateTodo(1, todo);
-        Assert.NotNull(result);
+        var result = _service.Update(1, dto);
+
+        Assert.True(result);
     }
 
     [Fact]
-    public void DeleteWorks()
+    public void Update_ReturnsFalse_WhenTodoDoesNotExist()
     {
-        var service = new TodoService();
-        var result = service.DeleteTodo(999);
+        _repoMock.Setup(r => r.Update(It.IsAny<Todo>()))
+            .Returns(false);
+
+        var dto = new UpdateTodoDto
+        {
+            Title = "Updated",
+            Description = "Updated",
+            IsCompleted = true
+        };
+
+        var result = _service.Update(99, dto);
 
         Assert.False(result);
     }
 
     [Fact]
-    public void ControllerTest()
+    public void Delete_ReturnsTrue_WhenTodoExists()
     {
-        var controller = new TodoController();
-        var todo = new Todo { Title = "Test", Description = "Desc" };
+        _repoMock.Setup(r => r.Delete(1))
+            .Returns(true);
 
-        var result = controller.CreateTodo(todo);
+        var result = _service.Delete(1);
 
-        Assert.NotNull(result);
+        Assert.True(result);
     }
 
     [Fact]
-    public void TestEverything()
+    public void Delete_ReturnsFalse_WhenTodoDoesNotExist()
     {
-        var service = new TodoService();
+        _repoMock.Setup(r => r.Delete(99))
+            .Returns(false);
 
-        var todo1 = service.CreateTodo(new Todo { Title = "1", Description = "D1" });
-        var todo2 = service.CreateTodo(new Todo { Title = "2", Description = "D2" });
+        var result = _service.Delete(99);
 
-        var all = service.GetAllTodos();
-
-        service.UpdateTodo(todo1.Id, new Todo { Title = "Updated", Description = "D1" });
-
-        service.DeleteTodo(todo2.Id);
-
-        Assert.True(all.Count >= 2);
+        Assert.False(result);
     }
 }
